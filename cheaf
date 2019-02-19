@@ -1,0 +1,262 @@
+#!/usr/bin/python3
+"""Usage: cheaf [options] <command> [<args>...]
+
+Cheaf -- The .eaf chef, a tool for processing ELAN files.
+
+Options:
+  -?,--help           display this help and exit
+  -V,--version        display version number and exit
+  -C,--color=<when>   colorize the output; WHEN can be 'always' (default
+                      if omitted), 'auto', or 'never'; more info below
+  -H,--with-filename  show filename for each
+              Print the file name for each match.  This is  the  default  when
+              there is more than one file to search.
+  -h,--no-filename    suppress filename for each match
+              Suppress  the  prefixing  of  file names on output.  This is the
+              default when there is only one file (or only standard input)  to
+              search.
+
+Commands:
+  annotations <tier> <file>...  show annotations in
+  extract-video <file>...       *NYI
+  help [<command>]              display help info about cheaf
+  tiers <file>...               list tier names
+
+FIXME:
+  * add command for replacing media in .eaf file
+"""
+__version__ = "0.1"
+__copyright__ = "Copyright (C) 2019 zrajm <zrajm@klingonska.org>"
+__license__ = "GPLv3 or later"
+
+import os
+import string
+import errno
+import re
+import sys
+from pympi import Elan
+from docopt import docopt, DocoptExit
+
+_exe = os.path.basename(__file__)
+_info = """%s %s
+%s
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.""" % (
+    _exe,
+    __version__,
+    __copyright__,
+)
+
+################################################################################
+##                                                                            ##
+## Sub-Command Functions                                                      ##
+##                                                                            ##
+################################################################################
+
+# XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+def cmd_help(args):
+    """Usage: cheaf help [<command>]
+
+Describes specified cheaf <command>, or gives general help information if no
+command was specified."""
+    command = args["<command>"]
+    if command == None:
+        docopt(__doc__, version=_info, argv='--help')
+
+    func = get_command_func(command)
+    if func == None:
+        error("'%s' is not an cheaf command" % command)
+    print(func.__doc__)
+    #descr = re.search('[a-z].*\\b' + command + '\\b.*', __doc__)
+    #print(descr)
+    #print(descr.group(0), "\n\n" + func.__doc__)
+
+# FIXED to work with multiple filenames
+def cmd_annotations(args):
+    """Usage: cheaf annotations <tier> [--] <file>...
+
+List annotations in specified <tier> in <file>s. Each annotation is listed with
+its start and end times (in milliseconds).
+
+TODO: <tier> should support regex pattern."""
+    tiername, filenames = args["TIER"], args["FILE"]
+    print_tty("%s\t%s\t%s" % ("BEGIN", "END", "VALUE"))
+    for filename in filenames:
+        eaf = Elan.Eaf(filename)
+        tiers = eaf.tiers
+        if tiername not in tiers:
+            warn("Tier '%s' not found in file '%s'" % (tiername, filename))
+            continue
+
+        for annotation in eaf.get_annotation_data_for_tier(tiername):
+            begin_ms, end_ms, value = annotation
+            print("%s\t%s\t%s" % (begin_ms, end_ms, value))
+
+def cmd_extract_video(args):
+    """Usage: cheaf extract-video <tier> <file>... <outdir>
+       cheaf extract-video --help
+
+TODO: NOT YET IMPLEMENTED
+
+Extract video snippets corresponding to each of the annotations in the given
+<tier> in each of the <file>s. Output is written to <outdir> (which is created
+if it does not already exist).
+
+Options:
+  -?,--help  display this help and exit"""
+
+    filenames, tiername = args["FILE"], args["TIER"]
+    for filename in filenames:
+        eaf = Elan.Eaf(filename)
+        tiers = eaf.tiers
+        media = eaf.get_linked_files()
+        print("MEDIA")
+        print(media)
+        print(media[0]['MEDIA_URL'])
+        count = {}
+        if tiername not in tiers:
+            warn("Tier '%s' not found" % tiername)
+        else:
+            for anno in eaf.get_annotation_data_for_tier(tiername):
+                (beg, end, gloss) = anno
+                count[gloss] = 1 if gloss not in count else count[gloss] + 1
+                outfile = "%s-%05d.mp4" % (gloss.lower(), count[gloss])
+                duration = end-beg
+                print("""----------------
+GLOSS: %s
+OUTNAME: %s
+FILE: %s
+TIER: %s
+BEG: %ss\t%sms
+DUR: %ss\t%sms
+ffmpeg -ss %.10g -i %s -c copy -t %.10g %s""" % (
+    gloss,
+    outfile,
+    filename,
+    tiername,
+    beg/1000, beg,
+    duration/1000, duration,
+    beg/1000, filename, duration/1000, outfile
+    # The timestamps need to be in HH:MM:SS.xxx format or in seconds (s.msec)
+    #ffmpeg -ss <start> -i <file> -c copy -t <duration> output.wmv
+))
+
+# XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+def cmd_tiers(args):
+    """Usage: cheaf tiers [--] <file>...
+
+List names of all tiers in specified <file>s."""
+    for filename in args["<file>"]:
+        try:
+            eaf = Elan.Eaf(filename)
+        except OSError as e:
+            error("Cannot open file '%s': %s" % (e.filename, e.args[1]))
+        tiers = eaf.tiers
+        for tiername in tiers.keys():
+            if args["show_filenames"]:
+                print("%s: %s" % (filename, tiername))
+            else:
+                print("%s" % tiername)
+
+################################################################################
+
+def print_tty(args):
+    if sys.stdout.isatty():
+        print(args)
+
+def warn(msg, *args):
+    binname = os.path.basename(__file__)
+    print("%s: %s" % (binname, msg), *args, file=sys.stderr)
+    #docopt(__doc__)
+
+def read_elan_file(filename):
+    eaf = Elan.Eaf(filename)
+
+def get_command_func(command):
+    try:
+        return globals()["cmd_" + re.sub("-", "_", command)]
+    except:
+        return None
+
+# Split argv into global option + subcommand and subcommand + command options.
+def split_args(args):
+    i = 0
+    for str in args:
+        if str[0] != '-': break
+        i += 1
+    return args[:i+1], args[i:]
+
+def die(msg):
+    sys.exit("%s: %s. See 'cheaf --help'." % (_exe, msg))
+
+def error(msg):
+    sys.exit("%s: %s" % (_exe, msg))
+
+################################################################################
+##                                                                            ##
+##  Main                                                                      ##
+##                                                                            ##
+################################################################################
+
+def main():
+    # Split into pre- and post-command arguments.
+    global_argv, cmd_argv = split_args(sys.argv[1:] or ["--help"])
+
+    # Parse global options.
+    try:
+        args = docopt(__doc__, version=_info, argv=global_argv)
+    except DocoptExit as e:
+        if global_argv[-1][0] == "-":
+            die("Missing cheaf command")
+        else:
+            die("Unknown global option")
+
+    # Get subcommand function.
+    del args["<args>"]                         # always empty
+    cmd_name = args.pop("<command>")           # always the command name
+    cmdfunc = get_command_func(cmd_name)
+    if cmdfunc == None:
+        die("'%s' is not an cheaf command" % cmd_name)
+
+    # Parse subcommand options.
+    try:
+        subargs = docopt(cmdfunc.__doc__, argv=cmd_argv)
+    except DocoptExit as e:
+        error(
+            "'%s' has invalid arguments. See 'cheaf %s --help'." %
+            (cmd_name, cmd_name)
+        )
+    del subargs[cmd_name]                      # always the command name
+    args.update(subargs)
+
+    if "<file>" in args:
+        args["show_filenames"] = True if len(args["<file>"]) > 1 else False
+        if args["--no-filename"]: args["show_filenames"] = False
+        if args["--with-filename"]: args["show_filenames"] = True
+        del args["--no-filename"], args["--with-filename"]
+
+    args["color"] = True if sys.stdout.isatty() else False;
+    try:
+        args["color"] = {
+            "always": True,
+            "on": True,
+            "yes": True,
+            "never": False,
+            "no": False,
+            "off": False,
+        }[args["--color"]]
+    except:
+        pass
+    print(args)
+
+    # Call subcommand function.
+    cmdfunc(args)
+
+if __name__ == '__main__':
+    try: main()
+    except ConnectionError:
+        sys.exit()
+    except KeyboardInterrupt:
+        sys.exit('***BREAK keyboard interrupt')
+
+#[eof]
