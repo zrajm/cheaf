@@ -24,8 +24,9 @@ Commands:
 
 FIXME:
   * add command for replacing media in .eaf file
+  * add command for dumping .eaf as JSON
 """
-__version__ = "0.1"
+__version__ = "0.0.1"
 __copyright__ = "Copyright (C) 2019 zrajm <zrajm@klingonska.org>"
 __license__ = "GPLv3 or later"
 
