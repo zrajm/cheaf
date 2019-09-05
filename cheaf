@@ -81,7 +81,7 @@ command was specified."""
     #print(descr)
     #print(descr.group(0), "\n\n" + func.__doc__)
 
-# FIXED to work with multiple filenames
+# WORKING?
 def cmd_annotations(args):
     """Usage: cheaf annotations <tier> [--] <file>...
 
@@ -102,6 +102,7 @@ TODO: <tier> should support regex pattern."""
             begin_ms, end_ms, value = annotation
             print("%s\t%s\t%s" % (begin_ms, end_ms, value))
 
+# WORKING?
 def cmd_extract_video(args):
     """Usage: cheaf extract-video <tier> <file>... <outdir>
        cheaf extract-video --help
@@ -151,7 +152,7 @@ ffmpeg -ss %.10g -i %s -c copy -t %.10g %s""" % (
     #ffmpeg -ss <start> -i <file> -c copy -t <duration> output.wmv
 ))
 
-# XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# WORKS
 def cmd_tiers(args):
     """Usage: cheaf tiers [--] <file>...
 
