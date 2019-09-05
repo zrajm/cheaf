@@ -6,8 +6,8 @@ Cheaf (the .eaf chef) is a tool for processing ELAN files.
 Options:
   -?,--help           display this help and exit
   -V,--version        display version number and exit
-  -C,--color=<when>   colorize the output; WHEN can be 'always' (default
-                      if omitted), 'auto', or 'never'; more info below
+  -C,--color=WHEN     colorize the output; WHEN can be 'always', 'auto', or
+                      'never'; more info below [default: auto]
   -H,--with-filename  show filename for each
               Print the file name for each match.  This is  the  default  when
               there is more than one file to search.
@@ -26,7 +26,7 @@ FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 __copyright__ = "Copyright (C) 2019 zrajm <zrajm@klingonska.org>"
 __license__ = "GPLv3 or later"
 
@@ -245,19 +245,21 @@ def main():
         if args["--with-filename"]: args["show_filenames"] = True
         del args["--no-filename"], args["--with-filename"]
 
-    args["color"] = True if sys.stdout.isatty() else False;
-    try:
-        args["color"] = {
-            "always": True,
-            "on": True,
-            "yes": True,
-            "never": False,
-            "no": False,
-            "off": False,
-        }[args["--color"]]
-    except:
-        pass
-    print(args)
+    # set 'color' (from '--color' option or default value)
+    if args["--color"] in ("always", "yes", "force"):
+        args["color"] = True
+    elif args["--color"] in ("never", "no", "none"):
+        args["color"] = False
+    elif args["--color"] in ("auto", "tty", "if-tty"):
+        args["color"] = True if sys.stdout.isatty() else False;
+    else:
+        error((
+            "Invalid argument '%s' for '--color'\n" +
+            "Valid arguments are:\n" +
+            "  - 'always', 'yes', 'force'\n" +
+            "  - 'never', 'no', 'none'\n" +
+            "  - 'auto', 'tty', 'if-tty'") % args["--color"]
+        )
 
     # Call subcommand function.
     cmdfunc(args)
