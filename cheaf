@@ -26,7 +26,7 @@ FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 __copyright__ = "Copyright (C) 2019 zrajm <zrajm@klingonska.org>"
 __license__ = "GPLv3 or later"
 
@@ -35,8 +35,6 @@ import string
 import errno
 import re
 import sys
-from pympi import Elan
-from docopt import docopt, DocoptExit
 
 _exe = os.path.basename(__file__)
 _info = """%s %s
@@ -48,13 +46,24 @@ This is free software: you are free to change and redistribute it.""" % (
     __copyright__,
 )
 
+# Import non-standard modules
+try:
+    from pympi import Elan
+except ImportError:
+    sys.exit("""%s: Missing module 'pympi'\n
+    Install with: 'pip3 install pympi-ling'\n""" % _exe)
+try:
+    from docopt import docopt, DocoptExit
+except ImportError:
+    sys.exit("""%s: Missing module 'docopt'\n
+    Install with: 'pip3 install docopt'\n""" % _exe)
+
 ################################################################################
 ##                                                                            ##
 ## Sub-Command Functions                                                      ##
 ##                                                                            ##
 ################################################################################
 
-# XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 def cmd_help(args):
     """Usage: cheaf help [<command>]
 
