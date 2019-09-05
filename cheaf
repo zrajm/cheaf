@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Usage: cheaf [options] <command> [<args>...]
 
-Cheaf -- The .eaf chef, a tool for processing ELAN files.
+Cheaf (the .eaf chef) is a tool for processing ELAN files.
 
 Options:
   -?,--help           display this help and exit
