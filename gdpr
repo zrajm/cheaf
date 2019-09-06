@@ -1,0 +1,158 @@
+#!/usr/bin/python3
+"""Usage: gdpr [EAFFILE]...
+
+This is a simple tool for GDPR processing of ELAN files.
+(This help information is displayed if 'gdpr' is run without arguments.)
+
+Process all EAFFILE(s) given on the command line. Output files will have the
+same name as the input, but with the added '.gdpr.eaf' at the end.
+
+The script goes through all tiers, moving all annotations which contain '@pt'
+into a new tier called 'Personref', and replacing the original value of the
+found annotation with 'PERSREF#'. (All instances of the same name will get the
+same 'PERSONREF#' string, the first occuring name will be replaced by
+'PERSONREF1', the second with 'PERSONREF2' etc.)
+
+If the script is run over several files then 'PERSONREF#' this counter is NOT
+reset between files. (So that the first name to appear in the second file would
+be replaced with 'PERSONREF5' if there where four names in the first file.)
+
+Written for Svenskt Teckenspråkslexikon.
+
+Copyright (C) 2019 zrajm <zrajm@klingonska.org>
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it."""
+
+import os
+import re
+import sys
+_exe = os.path.basename(__file__)
+# Import non-standard module.
+try:
+    from pympi import Elan
+except ImportError:
+    sys.exit("""%s: Missing module 'pympi'\n
+    Install with: 'pip3 install pympi-ling'\n""" % _exe)
+
+################################################################################
+
+def die(msg): sys.exit("%s: %s. See 'cheaf --help'." % (_exe, msg))
+
+def error(msg): sys.exit("%s: %s" % (_exe, msg))
+
+# Open EAF file or die.
+def eaf_open(filename):
+    try:
+        return Elan.Eaf(filename)
+    except OSError as e:
+        error("Cannot open file '%s': %s" % (e.filename, e.args[1]))
+
+# Return one Python dictionary one containing information for all the all
+# <ALIGNABLE_ANNOTATION>s (regardless if which tier they are in). The
+# dictionary key for each annotation is the ANNOTATION_ID, the value is a tuple
+# containing the (tier_name, begin_time_slot_id, end_time_slot_id) that belongs
+# to that annotation. (This is useful to resolve references in
+# <REF_ANNOTATIONS>.)
+def eaf_aligned_annotations(eaf):
+    all_aligned = {}
+    for tier_name in eaf.tiers.keys():
+        (aligned, _, _, _) = eaf.tiers[tier_name]
+        for anno_id in aligned.keys():
+            # Format: [{id -> (begin_ts, end_ts, value, svg_ref)}]
+            (begin, end, _, _) = aligned[anno_id]
+            if anno_id in all_aligned:
+                die("Annotation ID '%s' occurs multiple times in input" % anno_id)
+            all_aligned[anno_id] = (tier_name, begin, end)
+    return all_aligned
+
+# Class which generate a 'PERSREF#' string for a given name. If given the same
+# name again it will return the same 'PERSREF#' number as the first time. If
+# given a new name the number part of 'PERSREF#' is incremented by one.
+class PersonRef:
+    namerefs = {}
+    counter = 1
+    def get_next(self, name):
+        # Strip off final '[NN]' from name.
+        name = re.sub("\[NN\]$", "", name)
+        if not name in self.namerefs:
+            self.namerefs[name] = "PERSREF" + str(self.counter)
+            self.counter += 1
+
+        return self.namerefs[name]
+
+################################################################################
+##                                                                            ##
+##  Main                                                                      ##
+##                                                                            ##
+################################################################################
+
+def main(files):
+    if len(files) == 0: sys.exit(__doc__)
+
+    new_tier_name = "Personref"
+    name_ref = PersonRef()
+    for file in files:
+        outfile = re.sub("\.eaf$", "", file) + ".gdpr.eaf"
+        print("Processing: '%s' -> '%s'" % (file, outfile))
+        eaf = eaf_open(file)
+        annotations_to_add = []
+        all_aligned = eaf_aligned_annotations(eaf)
+
+        # It is not possible to modify the content of an annotation in
+        # pympi/Elan therefore we do ugly hacks with the internals here.
+        # NOT SURE IF THIS IS RECCOMENDED BEHAVIOR, but it seems to work.
+        for tier_name in eaf.tiers.keys():
+
+            # Docs for .tier() says the internal dictionary format is:
+            # { tier_name = (aligned_annotations, reference_annotations, attributes, ordinal) }
+            # (And we don't care about the attributes and ordinal numbers here.)
+            (aligned, reference, _, _) = eaf.tiers[tier_name]
+
+            # Replace '@pt' annotations with 'PERSREF#' in <ALIGNABLE_ANNOTATION>.
+            for anno_id in aligned.keys():
+                # Format: [{id -> (begin_ts, end_ts, value, svg_ref)}]
+                (begin_ref, end_ref, value, ref) = aligned[anno_id]
+                if re.search("@pt", value):
+                    # Replace original value with 'PERSREF#'.
+                    persref = name_ref.get_next(value);
+                    aligned[anno_id] = (begin_ref, end_ref, persref, ref)
+
+                    # Note that entry should be added 'Personref' tier later.
+                    annotations_to_add.append((value, tier_name, begin_ref, end_ref))
+
+            # Replace '@pt' annotations with 'PERSREF#' in <REF_ANNOTATION>.
+            for anno_id in reference.keys():
+                # Format: [{id -> (reference, value, previous, svg_ref)}]
+                (anno_ref, value, previous, svg_ref) = reference[anno_id]
+
+                if re.search("@pt", value):
+                    # Replace original value with 'PERSREF#'.
+                    persref = name_ref.get_next(value);
+                    reference[anno_id] = (anno_ref, persref, previous, svg_ref)
+
+                    # Note that entry should be added 'Personref' tier later.
+                    (tier_name, begin_ref, end_ref) = all_aligned[anno_ref]
+                    annotations_to_add.append((value, tier_name, begin_ref, end_ref))
+
+        # Add new 'Personref' tier.
+        # FIXME: Make sure LINGUISTIC_TYPE_REF="default-lt" is set in output file
+        # ("default-lt" is even the default in 'pymPI/Elan.py', so why doesn't this work?!)
+        eaf.add_tier(new_tier_name, ling="default-lt", locale="sv")
+
+        # And add all the collected annotations to that tier.
+        for annotation in annotations_to_add:
+            (name, tier_name, begin, end) = annotation
+            time = round((eaf.timeslots[begin] + eaf.timeslots[begin]) / 2)
+            # FIXME: Warn if added annotation overlaps previously existing one!!
+            eaf.add_ref_annotation(new_tier_name, tier_name, time, name)
+
+        eaf.to_file(outfile)
+
+if __name__ == '__main__':
+    try: main(sys.argv[1:])
+    except ConnectionError:
+        sys.exit()
+    except KeyboardInterrupt:
+        sys.exit('***BREAK keyboard interrupt')
+
+#[eof]
