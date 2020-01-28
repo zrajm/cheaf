@@ -26,9 +26,10 @@ FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.3"
-__copyright__ = "Copyright (C) 2019 zrajm <zrajm@klingonska.org>"
-__license__ = "GPLv3 or later"
+__version__ = "0.0.4"
+__copyright__ = "Copyright (C) 2019-2020 zrajm <zrajm@klingonska.org>"
+__license__ = """GPLv2: GNU General Public License, version 2,
+<https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
 
 import os
 import string
@@ -39,11 +40,12 @@ import sys
 _exe = os.path.basename(__file__)
 _info = """%s %s
 %s
-License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+License %s.
 This is free software: you are free to change and redistribute it.""" % (
     _exe,
     __version__,
     __copyright__,
+    __license__,
 )
 
 # Import non-standard modules
