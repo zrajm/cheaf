@@ -1,6 +1,7 @@
 # Cheaf
 
-Swiss army knife for shell scripting with ELAN’s EAF files.
+The EAF chef – It slices and dices your annotation files any way you like it!
+This is a small tool to help you do shell scripting with ELAN’s EAF files.
 
 This is a simple tool I’ve written to extract for the purpose of simplifying
 shell scripting with ELAN data. It uses the Python module [pympi-ling] to read
