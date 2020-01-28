@@ -25,12 +25,13 @@ installing it as a dependency.
 
 ## ELAN
 
-ELAN is an annotation tool developed by [The Language Archive] at the [Max
+[ELAN] is an annotation tool developed by [The Language Archive] at the [Max
 Planck Institute for Psycholinguistics] in the Netherlands. It is used for
 annotating video and audio data.
 
 Unfortunately its output data is in XML format, which isn't very shell script
-friendly.
+friendly. This tool tries to bridge (some of the gap) between the (horrendous)
+XML and the shell.
 
 
 ## Copyright
