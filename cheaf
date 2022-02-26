@@ -26,8 +26,8 @@ FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.6"
-__copyright__ = "Copyright (C) 2019-2020 zrajm <zrajm@klingonska.org>"
+__version__ = "0.0.7"
+__copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
 <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
 
@@ -252,16 +252,27 @@ def die(msg):
 def error(msg):
     sys.exit("%s: %s" % (_exe, msg))
 
-# Convert milliseconds to h:mm:ss.ddd format.
 def stringify_ms(ms):
+    """Convert EAF milliseconds to [h:]mm:ss.ddd[ddd] format. (Hours are left out
+    if zero, same with any decimals except the first three.)
+
+    Make sure there are exactly three decimals (if possible). Prettifies output
+    by giving all timestamps the same length. This is done by grabbing leading
+    non-zero decimals, then zero-padding to three places. Needed because EAF
+    files only have millisecond precision (i.e. to three decimal places), but
+    Python 'datetime' return either six or zero decimals. This only ever strip
+    off trailing *zeroes*, so, if there are more than three non-zero decimals
+    (or if the hour is non-zero) then returned values will have variable
+    length.
+    """
     import datetime
-    return re.sub(
-        r'(?:(\.\d{3})0{3})?$',          # match final six decimals
-        lambda m: (                      #
-            '.000' if m.group(0) == ''   # no decmals: add '.000'
-            else m.group(1)              # if last three '000': strip them
-        ),
-        str(datetime.timedelta(seconds = ms / 1000))
+    timestr = str(datetime.timedelta(seconds = ms / 1000))
+    timestr = re.sub(r'^0+:', '', timestr, 1)  # strip hours (if zero)
+    return re.sub(                             # prefer 3 decimal places
+        r'(?:([.][0-9]+?)0*)?$',
+        lambda m: (m.group(1) if m.group(0) else '.').ljust(4, '0'),
+        timestr,
+        1,
     )
 
 ################################################################################
