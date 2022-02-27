@@ -37,7 +37,7 @@ XML and the shell.
 
 ## Copyright
 
-Written 2019–2020 by zrajm. Released under [Gnu Public License Version
+Written 2019–2022 by zrajm. Released under [Gnu Public License Version
 2][GPLv2].
 
 [pympi-ling]: https://pypi.org/project/pympi-ling/

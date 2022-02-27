@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Usage: cheaf [OPTION]... [COMMAND [ARG...]]
+r"""Usage: cheaf [OPTION]... [COMMAND [ARG...]]
 Cheaf (EAF chef) is a tool for processing ELAN annotation files.
 
 Options:
@@ -26,7 +26,7 @@ FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.16"
+__version__ = "0.0.17"
 __copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
   <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
@@ -79,7 +79,7 @@ def open_eaf(filename):
 ################################################################################
 
 def cmd_version(args = None):
-    """Usage: cheaf version
+    r"""Usage: cheaf version
 
     Print cheaf version number, author name and copyright information.
 
@@ -92,7 +92,7 @@ def cmd_version(args = None):
         sep='\n')
 
 def cmd_help(args):
-    """Usage: cheaf help [COMMAND]
+    r"""Usage: cheaf help [COMMAND]
 
     Show help information about the given cheaf COMMAND (or general information
     about cheaf, if no command was specified).
@@ -175,7 +175,7 @@ def cmd_annot(args):
 
 # WORKING?
 def cmd_extract_video(args):
-    """Usage: cheaf extract-video TIER FILE... OUTDIR
+    r"""Usage: cheaf extract-video TIER FILE... OUTDIR
 
     TODO: NOT YET IMPLEMENTED
 
@@ -225,7 +225,7 @@ ffmpeg -ss %.10g -i %s -c copy -t %.10g %s""" % (
 
 # WORKS
 def cmd_media(args):
-    """Usage: cheaf media [--] FILE...
+    r"""Usage: cheaf media [--] FILE...
 
     List names of all media files given in specified FILE(s). For each media
     file there will be one line of output with three tab-separated values
@@ -243,7 +243,7 @@ def cmd_media(args):
 
 # WORKS
 def cmd_tiers(args):
-    """Usage: cheaf tiers [--] FILE...
+    r"""Usage: cheaf tiers [--] FILE...
 
     List names of all tiers in specified FILE(s).
 
@@ -287,7 +287,7 @@ def split_args(args):
     return args[:i+1], args[i:]
 
 def stringify_ms(ms):
-    """Convert EAF milliseconds to [H:]MM:SS.DDD[DDD] format. (Hours are left out
+    r"""Convert EAF milliseconds to [H:]MM:SS.DDD[DDD] format. (Hours are left out
     if zero, same with any decimals except the first three.)
 
     Make sure there are exactly three decimals (if possible). Prettifies output
@@ -320,7 +320,7 @@ def hilite(regex, string):
     return regex.sub(lambda match: '\x1B[7m%s\x1B[m' % match[0], string)
 
 def escape(string):
-    """Escape any ASCII control characters with C escape sequences."""
+    r"""Escape any ASCII control characters with C escape sequences."""
     esc = { '\a':r'\a', '\b':r'\b', '\f':r'\f', '\n':r'\n',
             '\r':r'\r', '\t':r'\t', '\v':r'\v', '\\':r'\\', '\x1b':r'\e' }
     return re.sub(
@@ -328,29 +328,30 @@ def escape(string):
         lambda m: esc.get(m[0], '\\x%02X' % ord(m[0])),
         string)
 
-# Return name of the command for which help was requested, or None if no
-# '--help', '-h' option or 'help' command was found. '-h' may only occur after
-# a command (if it comes before it's an alias for the global option
-# '--no-filename'). Command line scanning stops if '--' is encountered.
-
-# 'help' (first command)
-#   cheaf help       -> help (no cmd)
-#   cheaf -h help    -> help (no cmd)
-#   cheaf help annot -> help 'annot'
-#   cheaf annot help -> no help (invokes 'annot' with arg 'help')
-#
-# '-h' (must come after command)
-#   cheaf -h         -> help (no cmd)
-#   cheaf help -h    -> help 'help'
-#   cheaf annot -h   -> help 'annot'
-#   cheaf -h annot   -> no help (invokes 'annot')
-#
-# '--help' (anywhere on command line)
-#   cheaf --help        -> help (no cmd)
-#   cheaf --help annot  -> help 'annot'
-#   cheaf annot --help  -> help 'annot'
-#
 def get_help_option(argv):
+    r"""Return name of the command for which help was requested, or None if no
+    --help, -h option or 'help' command was found. -h may only occur after a
+    command (if it comes before it's an alias for the global option
+    --no-filename). Command line scanning stops if '--' is encountered.
+
+    'help' (first command)
+      cheaf help       -> help (no cmd)
+      cheaf -h help    -> help (no cmd)
+      cheaf help annot -> help 'annot'
+      cheaf annot help -> no help (invokes 'annot' with arg 'help')
+
+    '-h' (must come after command)
+      cheaf -h         -> help (no cmd)
+      cheaf help -h    -> help 'help'
+      cheaf annot -h   -> help 'annot'
+      cheaf -h annot   -> no help (invokes 'annot')
+
+    '--help' (anywhere on command line)
+      cheaf --help        -> help (no cmd)
+      cheaf --help annot  -> help 'annot'
+      cheaf annot --help  -> help 'annot'
+
+    """
     lopt  = False  # '--help' found
     shopt = False  # '-h' found (nulled if command is found)
     cmds = []      # commands found
@@ -376,7 +377,7 @@ def get_help_option(argv):
     return (False, None)
 
 def mydocopt(argv, func = None):
-    """Wrapper for docopt function (to make it behave a bit nicer)."""
+    r"""Wrapper for docopt function (to make it behave a bit nicer)."""
     doc = func.__doc__ if func else __doc__
     doc = doc.replace('[OPTION]...', '[options]')
     doc = re.sub(r'.*--help.*\n', '', doc)
