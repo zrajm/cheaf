@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Usage: cheaf [OPTION]... COMMAND [ARG...]
+"""Usage: cheaf [OPTION]... [COMMAND [ARG...]]
 
 Cheaf (EAF chef) is a tool for processing ELAN annotation files.
 
@@ -20,12 +20,13 @@ Commands:
   extract-video FILE...  *NYI
   help [COMMAND]         show help information about cheaf (or cheaf command)
   tiers FILE...          list tier names
+  version                show version information
 
 FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.12"
+__version__ = "0.0.13"
 __copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
   <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
@@ -37,15 +38,6 @@ import re
 import sys
 
 _exe = os.path.basename(__file__)
-_info = """%s %s
-%s
-License %s.
-This is free software: you are free to change and redistribute it.""" % (
-    _exe,
-    __version__,
-    __copyright__,
-    __license__,
-)
 
 # Import non-standard modules
 try:
@@ -85,6 +77,19 @@ def open_eaf(filename):
 ##  Sub-Command Functions                                                     ##
 ##                                                                            ##
 ################################################################################
+
+def cmd_version(args = None):
+    """Usage: cheaf version
+
+    Print cheaf version number, author name and copyright information.
+
+    """
+    print(
+        "%s %s"       % (_exe, __version__),
+        "%s"          % __copyright__,
+        "License %s." % __license__,
+        "This is free software: you are free to change and redistribute it.",
+        sep='\n')
 
 def cmd_help(args):
     """Usage: cheaf help [COMMAND]
@@ -246,7 +251,8 @@ def get_command_func(command):
     try:
         return globals()["cmd_" + re.sub("-", "_", command)]
     except:
-        raise CheafError("'%s' is not a cheaf command" % command)
+        raise CheafError("'%s' is not a cheaf command" % command if command else
+                         "Missing cheaf command")
 
 # Split argv into global option + subcommand and subcommand + command options.
 def split_args(args):
@@ -327,13 +333,13 @@ def get_help_option(argv):
     except: pass
     return (False, None)
 
-def mydocopt(argv, func = None, version = None):
+def mydocopt(argv, func = None):
     """Wrapper for docopt function (to make it behave a bit nicer)."""
     doc = func.__doc__ if func else __doc__
     doc = doc.replace('[OPTION]...', '[options]')
     doc = re.sub(r'.*--help.*\n', '', doc)
     doc = re.sub(r"\((default:[^)]*)\)", r"[\1]", doc)
-    return docopt(doc, argv, help=False, version=version)
+    return docopt(doc, argv, help=False)
 
 ################################################################################
 ##                                                                            ##
@@ -353,7 +359,7 @@ def main():
         sys.exit()
 
     # Parse global options.
-    try: args = mydocopt(global_argv, version=_info)
+    try: args = mydocopt(global_argv)
     except DocoptExit as e:
         if not global_argv or global_argv[-1][0] == "-":
             raise CheafError("Missing cheaf command")
@@ -362,6 +368,9 @@ def main():
 
     # Get subcommand function.
     del args["ARG"]                            # always empty
+    if args['--version']:                      # --version
+        args['COMMAND'] = 'version'
+        cmd_argv.insert(0, 'version')
     cmd_name = args.pop("COMMAND")             # always the command name
     cmdfunc = get_command_func(cmd_name)
 
