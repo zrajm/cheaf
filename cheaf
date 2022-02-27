@@ -18,6 +18,7 @@ Commands:
   annot TIER FILE...     show annotations in
   extract-video FILE...  *NYI
   help [COMMAND]         show help information about cheaf (or cheaf command)
+  media FILE...          list media files
   tiers FILE...          list tier names
   version                show version information
 
@@ -25,7 +26,7 @@ FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.15"
+__version__ = "0.0.16"
 __copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
   <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
@@ -221,6 +222,24 @@ ffmpeg -ss %.10g -i %s -c copy -t %.10g %s""" % (
     # The timestamps need to be in HH:MM:SS.xxx format or in seconds (s.msec)
     #ffmpeg -ss START -i FILE -c copy -t DURATION output.wmv
 ))
+
+# WORKS
+def cmd_media(args):
+    """Usage: cheaf media [--] FILE...
+
+    List names of all media files given in specified FILE(s). For each media
+    file there will be one line of output with three tab-separated values
+    MIME_TYPE, RELATIVE_MEDIA_URL, MEDIA_URL.
+
+    """
+    for filename in args["FILE"]:
+        eaf = open_eaf(filename)
+        for media in eaf.media_descriptors:
+            print("\t".join((
+                escape(media["MIME_TYPE"]),
+                escape(media["RELATIVE_MEDIA_URL"]),
+                escape(media["MEDIA_URL"]),
+            )))
 
 # WORKS
 def cmd_tiers(args):
