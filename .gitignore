@@ -1,8 +1,13 @@
 # -*- conf -*-
+
+# Backup files.
 \#*#
 .#*
 *~
 *.bak
 *.tmp
+
+# Other.
+/__pycache__/
 
 #[eof]
