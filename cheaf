@@ -31,7 +31,7 @@ FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.10"
+__version__ = "0.0.11"
 __copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
   <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
@@ -81,11 +81,10 @@ def open_eaf(filename):
         sys.stdout, sys.stderr = sys.stderr, sys.stdout
         return eaf
     except OSError as e:
-        print(
-            "Cannot open ELAN file '%s': %s" % (e.filename, e.args[1]),
-            file=sys.stderr
+        raise CheafError(
+            "Can't open EAF file, %s: '%s'" % (e.args[1], e.filename),
+            tips=False,
         )
-        return None
 
 ################################################################################
 ##                                                                            ##
@@ -107,13 +106,12 @@ the help info for the cheaf command you ran. -- When a help option is used, all
 other options, except for the first given <command> are intentionally
 ignored.)"""
     cmd = args["<command>"]
-    if cmd:
-        func = get_command_func(cmd)
-        if func == None:
-            error("'%s' is not an cheaf command" % cmd)
-        doc = func.__doc__
-    else:
-        doc = __doc__
+    try:
+        doc = get_command_func(cmd).__doc__ if cmd else __doc__
+    except CheafError as e:    # modify and re-raise error
+        e.msg += ", no help found"
+        e.tips = False
+        raise e
     import inspect
     print(inspect.cleandoc(doc))
 
@@ -247,7 +245,7 @@ def get_command_func(command):
     try:
         return globals()["cmd_" + re.sub("-", "_", command)]
     except:
-        return None
+        raise CheafError("'%s' is not a cheaf command" % command)
 
 # Split argv into global option + subcommand and subcommand + command options.
 def split_args(args):
@@ -256,13 +254,6 @@ def split_args(args):
         if arg[:1] != '-': break
         i += 1
     return args[:i+1], args[i:]
-
-def die(msg, subcmd = ''):
-    sys.exit(("%s: %s. See 'cheaf %s --help'." % (_exe, msg, subcmd))
-             .replace('  ', ' '))
-
-def error(msg):
-    sys.exit("%s: %s" % (_exe, msg))
 
 def stringify_ms(ms):
     """Convert EAF milliseconds to [h:]mm:ss.ddd[ddd] format. (Hours are left out
@@ -356,23 +347,21 @@ def main():
         args = docopt(re.sub(r'.*--help .*\n', '', __doc__),
                       version=_info, argv=global_argv, help=False)
     except DocoptExit as e:
-        if global_argv and global_argv[-1][0] == "-":
-            die("Missing cheaf command")
+        if not global_argv or global_argv[-1][0] == "-":
+            raise CheafError("Missing cheaf command")
         else:
-            die("Unknown arguments")
+            raise CheafError("Unknown arguments")
 
     # Get subcommand function.
     del args["<args>"]                         # always empty
     cmd_name = args.pop("<command>")           # always the command name
     cmdfunc = get_command_func(cmd_name)
-    if cmdfunc == None:
-        die("'%s' is not a cheaf command" % cmd_name)
 
     # Parse subcommand options.
     try:
         subargs = docopt(cmdfunc.__doc__, argv=cmd_argv, help=False)
     except DocoptExit as e:
-        die("Unknown arguments for cheaf command '%s'" % cmd_name, cmd_name)
+        raise CheafError("Unknown arguments for command '%s'" % cmd_name, cmd_name)
     del subargs[cmd_name]                      # always the command name
     args.update(subargs)
 
@@ -390,20 +379,36 @@ def main():
     elif args["--color"] in ("auto", "tty", "if-tty"):
         args["color"] = True if sys.stdout.isatty() else False;
     else:
-        error((
-            "Unknown argument '%s' for '--color'\n" +
-            "Available arguments are:\n" +
-            "  - 'always', 'yes', 'force'\n" +
-            "  - 'never', 'no', 'none'\n" +
-            "  - 'auto', 'tty', 'if-tty'") % args["--color"]
-        )
+        raise CheafError('\n'.join([
+            "Unknown argument '%s' for '--color'"  % args["--color"],
+            "Available arguments are:",
+            "  - 'always', 'yes', 'force'",
+            "  - 'never', 'no', 'none'",
+            "  - 'auto', 'tty', 'if-tty'"
+        ]), tips=False)
 
     # Call subcommand function.
     cmdfunc(args)
     sys.exit()
 
+class CheafError(Exception):
+    def __init__(self, msg, subcmd = '', tips = True):
+        self.msg = msg
+        self.subcmd = subcmd
+        self.tips = tips
+    def __str__(self):
+        msg = [self.msg]
+        if self.tips:
+            msg[-1] += '.'
+            msg.append("See 'cheaf")
+            if self.subcmd: msg.append(self.subcmd)
+            msg.append("--help'.")
+        return ' '.join(msg)
+
 if __name__ == '__main__':
     try: main()
+    except CheafError as e:
+        sys.exit("%s: %s" % (_exe, e))
     except ConnectionError:
         sys.exit()
     except KeyboardInterrupt:
