@@ -1,13 +1,12 @@
 #!/usr/bin/python3
-"""Usage: cheaf [options] <command> [<args>...]
+"""Usage: cheaf [OPTION]... COMMAND [ARG...]
 
-Cheaf (the .eaf chef) is a tool for processing ELAN files.
+Cheaf (EAF chef) is a tool for processing ELAN annotation files.
 
 Options:
-  -h,--help           show help information about cheaf (same as 'help')
+  -h,--help           show help information about cheaf (-h only after COMMAND)
   -V,--version        show version information
-  -C,--color=WHEN     colorize the output; WHEN can be 'always', 'auto', or
-                      'never'; more info below [default: auto]
+  -C,--color=WHEN     colorize output: 'always'/'auto'/'never' (default: auto)
   -H,--with-filename  show filename for each
               Print the file name for each match.  This is  the  default  when
               there is more than one file to search.
@@ -17,21 +16,16 @@ Options:
               search.
 
 Commands:
-  annot <tier> <file>...   show annotations in
-  extract-video <file>...  *NYI
-  help [<command>]         show help information about cheaf (or cheaf command)
-  tiers <file>...          list tier names
-
-NOTE: The option '-h' is interpreted as '--no-filename' only if it comes before
-a <command>, otherwise it is interpreted as '--help' (allowing you to quickly
-add a '-h' at the end of a previously failed command in order to read up on
-it).
+  annot TIER FILE...     show annotations in
+  extract-video FILE...  *NYI
+  help [COMMAND]         show help information about cheaf (or cheaf command)
+  tiers FILE...          list tier names
 
 FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.11"
+__version__ = "0.0.12"
 __copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
   <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
@@ -93,19 +87,21 @@ def open_eaf(filename):
 ################################################################################
 
 def cmd_help(args):
-    """Usage: cheaf help [<command>]
+    """Usage: cheaf help [COMMAND]
 
-Show help information about the given cheaf <command> (or general information
-about cheaf, if no command was specified).
+    Show help information about the given cheaf COMMAND (or general information
+    about cheaf, if no command was specified).
 
-Options --help or -h also invoke this command. Though, if the short form (-h)
-is used before <command> then it acts as the --no-filename option. The long
-form (--help) may appear anywhere on the command line. (If a command fail on
-you, you may always re-execute the command with an added -h at the end to check
-the help info for the cheaf command you ran. -- When a help option is used, all
-other options, except for the first given <command> are intentionally
-ignored.)"""
-    cmd = args["<command>"]
+    Options --help or -h also invoke this command. Though, if the short form
+    (-h) is used before COMMAND then it acts as the --no-filename option. The
+    long form (--help) may appear anywhere on the command line. (If a command
+    fail on you, you may always re-execute the command with an added -h at the
+    end to check the help info for the cheaf command you ran. -- When a help
+    option is used, all other options, except for the first given COMMAND are
+    intentionally ignored.)
+
+    """
+    cmd = args["COMMAND"]
     try:
         doc = get_command_func(cmd).__doc__ if cmd else __doc__
     except CheafError as e:    # modify and re-raise error
@@ -117,25 +113,28 @@ ignored.)"""
 
 # WORKING?
 def cmd_annot(args):
-    """Usage: cheaf annot [options] [--] <file>...
+    """Usage: cheaf annot [OPTION]... [--] FILE...
 
-Options:
-  -t,--tier=REGEX   only output annotations in tiers with matching name
+    Options:
+      -t,--tier=REGEX   only output annotations in tiers with matching name
 
-Output matching annotations in <file>s. Output values are tab separated, and
-each line include start time, end time, tier name and the annotation value.
-(Time is output in 'h:mm:ss.ddd' format.)
+    Output matching annotations in FILE(s). Output values are tab separated,
+    and each line include start time, end time, tier name and the annotation
+    value. (Time is output in H:MM:SS.DDD format.)
 
-Global option --with-filename will prepend each line with filename (also tab
-separated), and if --color is in use then matching strings will be highlighted
-in the output.
+    Global option --with-filename will prepend each line with filename (also
+    tab separated), and if --color is in use then matching strings will be
+    highlighted in the output.
 
-No distinction is made between the EAF format's <ALIGNABLE_ANNOTATION> and
-<REF_ANNOTATION> – They are both included in the output, formatted in the same
-way. (I have yet to find a situation where distinguishing the two is relevant.)
+    No distinction is made between the EAF format's <ALIGNABLE_ANNOTATION> and
+    <REF_ANNOTATION> – They are both included in the output, formatted in the
+    same way. (I have yet to find a situation where distinguishing the two is
+    relevant.)
 
-TODO: <tier> should support regex pattern."""
-    filenames = args["<file>"]
+    TODO: TIER should support regex pattern.
+
+    """
+    filenames = args["FILE"]
     print_tty("%s\t%s\t%s" % ("BEGIN", "END", "VALUE"))
     for filename in filenames:
         eaf = open_eaf(filename)
@@ -166,18 +165,18 @@ TODO: <tier> should support regex pattern."""
 
 # WORKING?
 def cmd_extract_video(args):
-    """Usage: cheaf extract-video <tier> <file>... <outdir>
-       cheaf extract-video --help
+    """Usage: cheaf extract-video TIER FILE... OUTDIR
 
-TODO: NOT YET IMPLEMENTED
+    TODO: NOT YET IMPLEMENTED
 
-Extract video snippets corresponding to each of the annotations in the given
-<tier> in each of the <file>s. Output is written to <outdir> (which is created
-if it does not already exist).
+    Extract video snippets corresponding to each of the annotations in the
+    given TIER in each of the FILE(s). Output is written to OUTDIR (which is
+    created if it does not already exist).
 
-Options:
-  -?,--help  display this help and exit"""
+    Options:
+      -?,--help  display this help and exit
 
+    """
     filenames, tiername = args["FILE"], args["TIER"]
     for filename in filenames:
         eaf = Elan.Eaf(filename)
@@ -211,15 +210,17 @@ ffmpeg -ss %.10g -i %s -c copy -t %.10g %s""" % (
     duration/1000, duration,
     beg/1000, filename, duration/1000, outfile
     # The timestamps need to be in HH:MM:SS.xxx format or in seconds (s.msec)
-    #ffmpeg -ss <start> -i <file> -c copy -t <duration> output.wmv
+    #ffmpeg -ss START -i FILE -c copy -t DURATION output.wmv
 ))
 
 # WORKS
 def cmd_tiers(args):
-    """Usage: cheaf tiers [--] <file>...
+    """Usage: cheaf tiers [--] FILE...
 
-List names of all tiers in specified <file>s."""
-    for filename in args["<file>"]:
+    List names of all tiers in specified FILE(s).
+
+    """
+    for filename in args["FILE"]:
         eaf = open_eaf(filename)
         tiers = eaf.tiers
         for tiername in tiers.keys():
@@ -256,7 +257,7 @@ def split_args(args):
     return args[:i+1], args[i:]
 
 def stringify_ms(ms):
-    """Convert EAF milliseconds to [h:]mm:ss.ddd[ddd] format. (Hours are left out
+    """Convert EAF milliseconds to [H:]MM:SS.DDD[DDD] format. (Hours are left out
     if zero, same with any decimals except the first three.)
 
     Make sure there are exactly three decimals (if possible). Prettifies output
@@ -267,6 +268,7 @@ def stringify_ms(ms):
     off trailing *zeroes*, so, if there are more than three non-zero decimals
     (or if the hour is non-zero) then returned values will have variable
     length.
+
     """
     import datetime
     timestr = str(datetime.timedelta(seconds = ms / 1000))
@@ -325,6 +327,14 @@ def get_help_option(argv):
     except: pass
     return (False, None)
 
+def mydocopt(argv, func = None, version = None):
+    """Wrapper for docopt function (to make it behave a bit nicer)."""
+    doc = func.__doc__ if func else __doc__
+    doc = doc.replace('[OPTION]...', '[options]')
+    doc = re.sub(r'.*--help.*\n', '', doc)
+    doc = re.sub(r"\((default:[^)]*)\)", r"[\1]", doc)
+    return docopt(doc, argv, help=False, version=version)
+
 ################################################################################
 ##                                                                            ##
 ##  Main                                                                      ##
@@ -337,15 +347,13 @@ def main():
 
     helpopt, helpcmd = get_help_option(sys.argv)
     if helpopt:                                  # help option/command used?
-        args = { '<command>':  helpcmd }
+        args = { 'COMMAND':  helpcmd }
         cmdfunc = get_command_func('help')
         cmdfunc(args)                            # call subcommand function
         sys.exit()
 
     # Parse global options.
-    try:
-        args = docopt(re.sub(r'.*--help .*\n', '', __doc__),
-                      version=_info, argv=global_argv, help=False)
+    try: args = mydocopt(global_argv, version=_info)
     except DocoptExit as e:
         if not global_argv or global_argv[-1][0] == "-":
             raise CheafError("Missing cheaf command")
@@ -353,20 +361,19 @@ def main():
             raise CheafError("Unknown arguments")
 
     # Get subcommand function.
-    del args["<args>"]                         # always empty
-    cmd_name = args.pop("<command>")           # always the command name
+    del args["ARG"]                            # always empty
+    cmd_name = args.pop("COMMAND")             # always the command name
     cmdfunc = get_command_func(cmd_name)
 
     # Parse subcommand options.
-    try:
-        subargs = docopt(cmdfunc.__doc__, argv=cmd_argv, help=False)
+    try: subargs = mydocopt(cmd_argv, func=cmdfunc)
     except DocoptExit as e:
         raise CheafError("Unknown arguments for command '%s'" % cmd_name, cmd_name)
     del subargs[cmd_name]                      # always the command name
     args.update(subargs)
 
-    if "<file>" in args:
-        args["show_filenames"] = True if len(args["<file>"]) > 1 else False
+    if "FILE" in args:
+        args["show_filenames"] = True if len(args["FILE"]) > 1 else False
         if args["--no-filename"]: args["show_filenames"] = False
         if args["--with-filename"]: args["show_filenames"] = True
         del args["--no-filename"], args["--with-filename"]
