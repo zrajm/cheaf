@@ -19,17 +19,17 @@ Options:
 Commands:
   annot <tier> <file>...        show annotations in
   extract-video <file>...       *NYI
-  help [<command>]              display help info about cheaf
+  help [<command>]              display help info about cheaf (command)
   tiers <file>...               list tier names
 
 FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 __copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
-<https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
+  <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
 
 import os
 import string
@@ -62,7 +62,7 @@ except ImportError:
 
 ################################################################################
 ##                                                                            ##
-## Helper Functions                                                           ##
+##  Helper Functions                                                          ##
 ##                                                                            ##
 ################################################################################
 
@@ -84,7 +84,7 @@ def open_eaf(filename):
 
 ################################################################################
 ##                                                                            ##
-## Sub-Command Functions                                                      ##
+##  Sub-Command Functions                                                     ##
 ##                                                                            ##
 ################################################################################
 
@@ -99,18 +99,15 @@ command was specified."""
 
     func = get_command_func(command)
     if func == None:
-        error("'%s' is not an cheaf command" % command)
+        error("'%s' is not a cheaf command, no help found" % command)
     print(func.__doc__)
-    #descr = re.search('[a-z].*\\b' + command + '\\b.*', __doc__)
-    #print(descr)
-    #print(descr.group(0), "\n\n" + func.__doc__)
 
 # WORKING?
 def cmd_annot(args):
     """Usage: cheaf annot [options] [--] <file>...
 
 Options:
-    -t,--tier=REGEX   only output annotations in tiers with matching name
+  -t,--tier=REGEX   only output annotations in tiers with matching name
 
 Output matching annotations in <file>s. Output values are tab separated, and
 each line include start time, end time, tier name and the annotation value.
@@ -227,7 +224,6 @@ def print_tty(args):
 def warn(msg, *args):
     binname = os.path.basename(__file__)
     print("%s: %s" % (binname, msg), *args, file=sys.stderr)
-    #docopt(__doc__)
 
 def read_elan_file(filename):
     eaf = Elan.Eaf(filename)
@@ -246,8 +242,9 @@ def split_args(args):
         i += 1
     return args[:i+1], args[i:]
 
-def die(msg):
-    sys.exit("%s: %s. See 'cheaf --help'." % (_exe, msg))
+def die(msg, subcmd = ''):
+    sys.exit(("%s: %s. See 'cheaf %s --help'." % (_exe, msg, subcmd))
+             .replace('  ', ' '))
 
 def error(msg):
     sys.exit("%s: %s" % (_exe, msg))
@@ -292,23 +289,20 @@ def main():
         if global_argv[-1][0] == "-":
             die("Missing cheaf command")
         else:
-            die("Unknown global option")
+            die("Unknown arguments")
 
     # Get subcommand function.
     del args["<args>"]                         # always empty
     cmd_name = args.pop("<command>")           # always the command name
     cmdfunc = get_command_func(cmd_name)
     if cmdfunc == None:
-        die("'%s' is not an cheaf command" % cmd_name)
+        die("'%s' is not a cheaf command" % cmd_name)
 
     # Parse subcommand options.
     try:
         subargs = docopt(cmdfunc.__doc__, argv=cmd_argv)
     except DocoptExit as e:
-        error(
-            "'%s' has invalid arguments. See 'cheaf %s --help'." %
-            (cmd_name, cmd_name)
-        )
+        die("Unknown arguments for cheaf command '%s'" % cmd_name, cmd_name)
     del subargs[cmd_name]                      # always the command name
     args.update(subargs)
 
@@ -327,8 +321,8 @@ def main():
         args["color"] = True if sys.stdout.isatty() else False;
     else:
         error((
-            "Invalid argument '%s' for '--color'\n" +
-            "Valid arguments are:\n" +
+            "Unknown argument '%s' for '--color'\n" +
+            "Available arguments are:\n" +
             "  - 'always', 'yes', 'force'\n" +
             "  - 'never', 'no', 'none'\n" +
             "  - 'auto', 'tty', 'if-tty'") % args["--color"]
