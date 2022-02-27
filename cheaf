@@ -25,7 +25,7 @@ FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.14"
+__version__ = "0.0.15"
 __copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
   <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
@@ -120,7 +120,8 @@ def cmd_annot(args):
     r"""Usage: cheaf annot [OPTION]... [--] FILE...
 
     Options:
-      -t,--tier=REGEX   only output annotations in tiers with matching name
+      -t,--tier=REGEX    output tiers matching REGEX
+      -a,--annot=REGEX   output annotations matching REGEX
 
     Output annotations in FILE(s). Output values are tab separated, and each
     line include start and end time, tier name and the annotation
@@ -130,9 +131,9 @@ def cmd_annot(args):
     (newline = \n, tab = \t, escape = \e, for chars without one-letter
     abbreviations, hex notation is used, delete = \x7F).
 
-    If --tier=REGEX is specified, you'll have to match the escapes, not the
-    original character (usually an extra slash is needed, e.g. to search for a
-    newline use --tier="\\n").
+    When using --tier=REGEX or --anot=REGEX, you'll have to match the escapes,
+    not the original characters (usually an extra slash is needed, e.g. to
+    search for a newline use --tier="\\n").
 
     Global option --with-filename will prepend each line with filename (also
     tab separated), and if --color is in use then matching strings will be
@@ -145,19 +146,15 @@ def cmd_annot(args):
 
     """
     filenames = args["FILE"]
+    tier_re  = opt_to_regex(args, '--tier')
+    annot_re = opt_to_regex(args, '--annot')
     print_tty("%s\t%s\t%s" % ("BEGIN", "END", "VALUE"))
     for filename in filenames:
         eaf = open_eaf(filename)
-        tiers = eaf.tiers
-        regex = None
-        if args["--tier"]:
-            regex = re.compile('(%s)' % args["--tier"])
-            tiers = filter(regex.match, eaf.tiers)
-
+        tiers = filter(tier_re.search, eaf.tiers) if tier_re else eaf.tiers
         for tiername in tiers:
             tiername_out = escape(tiername)
-            if args["color"] and regex:
-                tiername_out = regex.sub('\x1B[7m\\1\x1B[m', tiername_out)
+            if tier_re and args["color"]: tiername_out = hilite(tier_re, tiername_out)
 
             for annot in eaf.get_annotation_data_for_tier(tiername):
                 try:                            # <ALIGNABLE_ANNOTATION>
@@ -168,10 +165,12 @@ def cmd_annot(args):
                 begin_ms = stringify_ms(begin_ms)
                 end_ms   = stringify_ms(end_ms)
                 value    = escape(value)
-                if args["show_filenames"]:
-                    print("\t".join((filename, begin_ms, end_ms, tiername_out, value)))
-                else:
-                    print("\t".join((          begin_ms, end_ms, tiername_out, value)))
+                if not annot_re or annot_re.search(value):
+                    if annot_re and args["color"]: value = hilite(annot_re, value);
+                    if args["show_filenames"]:
+                        print("\t".join((filename, begin_ms, end_ms, tiername_out, value)))
+                    else:
+                        print("\t".join((          begin_ms, end_ms, tiername_out, value)))
 
 # WORKING?
 def cmd_extract_video(args):
@@ -290,6 +289,16 @@ def stringify_ms(ms):
         lambda m: (m.group(1) if m.group(0) else '.').ljust(4, '0'),
         timestr,
         1)
+
+def opt_to_regex(args, opt):
+    try: return re.compile(args[opt]) if args[opt] else None
+    except re.error:
+        raise CheafError(
+            "Malformed regular expression in %s='%s'" % (opt, args[opt]),
+            tips=False)
+
+def hilite(regex, string):
+    return regex.sub(lambda match: '\x1B[7m%s\x1B[m' % match[0], string)
 
 def escape(string):
     """Escape any ASCII control characters with C escape sequences."""
