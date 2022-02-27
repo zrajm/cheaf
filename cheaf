@@ -26,7 +26,7 @@ FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.8"
+__version__ = "0.0.9"
 __copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
   <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
@@ -237,8 +237,8 @@ def get_command_func(command):
 # Split argv into global option + subcommand and subcommand + command options.
 def split_args(args):
     i = 0
-    for str in args:
-        if str[0] != '-': break
+    for arg in args:
+        if arg[:1] != '-': break
         i += 1
     return args[:i+1], args[i:]
 
@@ -280,13 +280,13 @@ def stringify_ms(ms):
 
 def main():
     # Split into pre- and post-command arguments.
-    global_argv, cmd_argv = split_args(sys.argv[1:] or ["--help"])
+    global_argv, cmd_argv = split_args(sys.argv[1:])
 
     # Parse global options.
     try:
         args = docopt(__doc__, version=_info, argv=global_argv)
     except DocoptExit as e:
-        if global_argv[-1][0] == "-":
+        if global_argv and global_argv[-1][0] == "-":
             die("Missing cheaf command")
         else:
             die("Unknown arguments")
