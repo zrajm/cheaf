@@ -4,8 +4,8 @@
 Cheaf (the .eaf chef) is a tool for processing ELAN files.
 
 Options:
-  -?,--help           display this help and exit
-  -V,--version        display version number and exit
+  -h,--help           show help information about cheaf (same as 'help')
+  -V,--version        show version information
   -C,--color=WHEN     colorize the output; WHEN can be 'always', 'auto', or
                       'never'; more info below [default: auto]
   -H,--with-filename  show filename for each
@@ -17,16 +17,21 @@ Options:
               search.
 
 Commands:
-  annot <tier> <file>...        show annotations in
-  extract-video <file>...       *NYI
-  help [<command>]              display help info about cheaf (command)
-  tiers <file>...               list tier names
+  annot <tier> <file>...   show annotations in
+  extract-video <file>...  *NYI
+  help [<command>]         show help information about cheaf (or cheaf command)
+  tiers <file>...          list tier names
+
+NOTE: The option '-h' is interpreted as '--no-filename' only if it comes before
+a <command>, otherwise it is interpreted as '--help' (allowing you to quickly
+add a '-h' at the end of a previously failed command in order to read up on
+it).
 
 FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.9"
+__version__ = "0.0.10"
 __copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
   <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
@@ -91,16 +96,26 @@ def open_eaf(filename):
 def cmd_help(args):
     """Usage: cheaf help [<command>]
 
-Describes specified cheaf <command>, or gives general help information if no
-command was specified."""
-    command = args["<command>"]
-    if command == None:
-        docopt(__doc__, version=_info, argv='--help')
+Show help information about the given cheaf <command> (or general information
+about cheaf, if no command was specified).
 
-    func = get_command_func(command)
-    if func == None:
-        error("'%s' is not a cheaf command, no help found" % command)
-    print(func.__doc__)
+Options --help or -h also invoke this command. Though, if the short form (-h)
+is used before <command> then it acts as the --no-filename option. The long
+form (--help) may appear anywhere on the command line. (If a command fail on
+you, you may always re-execute the command with an added -h at the end to check
+the help info for the cheaf command you ran. -- When a help option is used, all
+other options, except for the first given <command> are intentionally
+ignored.)"""
+    cmd = args["<command>"]
+    if cmd:
+        func = get_command_func(cmd)
+        if func == None:
+            error("'%s' is not an cheaf command" % cmd)
+        doc = func.__doc__
+    else:
+        doc = __doc__
+    import inspect
+    print(inspect.cleandoc(doc))
 
 # WORKING?
 def cmd_annot(args):
@@ -272,6 +287,53 @@ def stringify_ms(ms):
         1,
     )
 
+# Return name of the command for which help was requested, or None if no
+# '--help', '-h' option or 'help' command was found. '-h' may only occur after
+# a command (if it comes before it's an alias for the global option
+# '--no-filename'). Command line scanning stops if '--' is encountered.
+
+# 'help' (first command)
+#   cheaf help       -> help (no cmd)
+#   cheaf -h help    -> help (no cmd)
+#   cheaf help annot -> help 'annot'
+#   cheaf annot help -> no help (invokes 'annot' with arg 'help')
+#
+# '-h' (must come after command)
+#   cheaf -h         -> help (no cmd)
+#   cheaf help -h    -> help 'help'
+#   cheaf annot -h   -> help 'annot'
+#   cheaf -h annot   -> no help (invokes 'annot')
+#
+# '--help' (anywhere on command line)
+#   cheaf --help        -> help (no cmd)
+#   cheaf --help annot  -> help 'annot'
+#   cheaf annot --help  -> help 'annot'
+#
+def get_help_option(argv):
+    lopt  = False  # '--help' found
+    shopt = False  # '-h' found (nulled if command is found)
+    cmds = []      # commands found
+    for arg in argv[1:]:
+        if arg == '--': break
+        elif arg[:1] != '-':
+            cmds.append(arg)
+            if lopt: return (True, cmds[0])
+            shopt = False
+        elif arg == '-h':
+            if cmds: return (True, cmds[0])
+            shopt = True
+        elif arg == '--help':
+            if cmds: return (True, cmds[0])
+            lopt = True
+    if shopt or lopt:         # '--help' or '-h'
+        return (True, None)
+    try:                      # 'help'
+        if cmds[0] == 'help':
+            try   : return (True, cmds[1])  # w/  arg
+            except: return (True, None)     # w/o arg
+    except: pass
+    return (False, None)
+
 ################################################################################
 ##                                                                            ##
 ##  Main                                                                      ##
@@ -282,9 +344,17 @@ def main():
     # Split into pre- and post-command arguments.
     global_argv, cmd_argv = split_args(sys.argv[1:])
 
+    helpopt, helpcmd = get_help_option(sys.argv)
+    if helpopt:                                  # help option/command used?
+        args = { '<command>':  helpcmd }
+        cmdfunc = get_command_func('help')
+        cmdfunc(args)                            # call subcommand function
+        sys.exit()
+
     # Parse global options.
     try:
-        args = docopt(__doc__, version=_info, argv=global_argv)
+        args = docopt(re.sub(r'.*--help .*\n', '', __doc__),
+                      version=_info, argv=global_argv, help=False)
     except DocoptExit as e:
         if global_argv and global_argv[-1][0] == "-":
             die("Missing cheaf command")
@@ -300,7 +370,7 @@ def main():
 
     # Parse subcommand options.
     try:
-        subargs = docopt(cmdfunc.__doc__, argv=cmd_argv)
+        subargs = docopt(cmdfunc.__doc__, argv=cmd_argv, help=False)
     except DocoptExit as e:
         die("Unknown arguments for cheaf command '%s'" % cmd_name, cmd_name)
     del subargs[cmd_name]                      # always the command name
@@ -330,6 +400,7 @@ def main():
 
     # Call subcommand function.
     cmdfunc(args)
+    sys.exit()
 
 if __name__ == '__main__':
     try: main()
