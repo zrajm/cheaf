@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 """Usage: cheaf [OPTION]... [COMMAND [ARG...]]
-
 Cheaf (EAF chef) is a tool for processing ELAN annotation files.
 
 Options:
@@ -26,7 +25,7 @@ FIXME:
   * add command for replacing media in .eaf file
   * add command for dumping .eaf as JSON
 """
-__version__ = "0.0.13"
+__version__ = "0.0.14"
 __copyright__ = "Copyright (C) 2019-2022 zrajm <zrajm@klingonska.org>"
 __license__ = """GPLv2: GNU General Public License, version 2,
   <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>"""
@@ -118,14 +117,22 @@ def cmd_help(args):
 
 # WORKING?
 def cmd_annot(args):
-    """Usage: cheaf annot [OPTION]... [--] FILE...
+    r"""Usage: cheaf annot [OPTION]... [--] FILE...
 
     Options:
       -t,--tier=REGEX   only output annotations in tiers with matching name
 
-    Output matching annotations in FILE(s). Output values are tab separated,
-    and each line include start time, end time, tier name and the annotation
-    value. (Time is output in H:MM:SS.DDD format.)
+    Output annotations in FILE(s). Output values are tab separated, and each
+    line include start and end time, tier name and the annotation
+
+    Time is output in [H:]MM:SS.DDD format (hour is left out if zero). And
+    control characters in outputted strings are replaced with C escapes
+    (newline = \n, tab = \t, escape = \e, for chars without one-letter
+    abbreviations, hex notation is used, delete = \x7F).
+
+    If --tier=REGEX is specified, you'll have to match the escapes, not the
+    original character (usually an extra slash is needed, e.g. to search for a
+    newline use --tier="\\n").
 
     Global option --with-filename will prepend each line with filename (also
     tab separated), and if --color is in use then matching strings will be
@@ -136,37 +143,35 @@ def cmd_annot(args):
     same way. (I have yet to find a situation where distinguishing the two is
     relevant.)
 
-    TODO: TIER should support regex pattern.
-
     """
     filenames = args["FILE"]
     print_tty("%s\t%s\t%s" % ("BEGIN", "END", "VALUE"))
     for filename in filenames:
         eaf = open_eaf(filename)
         tiers = eaf.tiers
-
         regex = None
-        if args["--tier"] != None:
+        if args["--tier"]:
             regex = re.compile('(%s)' % args["--tier"])
             tiers = filter(regex.match, eaf.tiers)
 
         for tiername in tiers:
-            tiername_out = tiername
-            if args["color"] and regex != None:
-                tiername_out = regex.sub('\x1B[7m\\1\x1B[m', tiername)
+            tiername_out = escape(tiername)
+            if args["color"] and regex:
+                tiername_out = regex.sub('\x1B[7m\\1\x1B[m', tiername_out)
 
             for annot in eaf.get_annotation_data_for_tier(tiername):
                 try:                            # <ALIGNABLE_ANNOTATION>
-                    begin_ms, end_ms, value           = annot
+                    begin_ms, end_ms, value = annot
                 except ValueError as e:         # <REF_ANNOTATION>
                     begin_ms, end_ms, value, referent = annot
 
                 begin_ms = stringify_ms(begin_ms)
                 end_ms   = stringify_ms(end_ms)
+                value    = escape(value)
                 if args["show_filenames"]:
-                    print("%s\t%s\t%s\t%s\t%s" % (filename, begin_ms, end_ms, tiername_out, value))
+                    print("\t".join((filename, begin_ms, end_ms, tiername_out, value)))
                 else:
-                    print("%s\t%s\t%s\t%s"     % (          begin_ms, end_ms, tiername_out, value))
+                    print("\t".join((          begin_ms, end_ms, tiername_out, value)))
 
 # WORKING?
 def cmd_extract_video(args):
@@ -229,6 +234,7 @@ def cmd_tiers(args):
         eaf = open_eaf(filename)
         tiers = eaf.tiers
         for tiername in tiers.keys():
+            tiername = escape(tiername)
             if args["show_filenames"]:
                 print("%s: %s" % (filename, tiername))
             else:
@@ -283,8 +289,16 @@ def stringify_ms(ms):
         r'(?:([.][0-9]+?)0*)?$',
         lambda m: (m.group(1) if m.group(0) else '.').ljust(4, '0'),
         timestr,
-        1,
-    )
+        1)
+
+def escape(string):
+    """Escape any ASCII control characters with C escape sequences."""
+    esc = { '\a':r'\a', '\b':r'\b', '\f':r'\f', '\n':r'\n',
+            '\r':r'\r', '\t':r'\t', '\v':r'\v', '\\':r'\\', '\x1b':r'\e' }
+    return re.sub(
+        r'[\\\x00-\x1f\x7f-\x9f]',
+        lambda m: esc.get(m[0], '\\x%02X' % ord(m[0])),
+        string)
 
 # Return name of the command for which help was requested, or None if no
 # '--help', '-h' option or 'help' command was found. '-h' may only occur after
